@@ -31,7 +31,7 @@ emitter.emit("event", "argument");
 
 ## Motivation
 
-After some research, I wasn't satisfied by the numerous implementation of EventEmitter. Of all browser+node.js implementations that I found, none was both concise but complete enough for my taste. 
+After research, I wasn't satisfied by the implementations of EventEmitter I could find. Of all browser+node.js implementations I could find, none was both concise and complete enough. 
 
 ## Installation
 
