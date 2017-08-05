@@ -1,0 +1,17 @@
+{
+  "name": "events",
+  "description": "",
+  "version": "1.0.0",
+  "main": "events.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcus-timtow/EventEmitter.git"
+  },
+  "keywords": ["events", "EventEmitter", "EventListener", "observer", "pub/sub", "publisher", "subscriber"],
+  "author": "Marcus Timtow",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/marcus-timtow/EventEmitter/issues"
+  },
+  "homepage": "https://github.com/marcus-timtow/EventEmitter"
+}
