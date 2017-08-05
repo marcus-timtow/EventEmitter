@@ -14,38 +14,39 @@ The `EventListener` class expose a single **listener** interface.
 
 ## Code Example
 
-        /* Create a new EventEmitter */
-        let emitter = new EventEmitter();
-        
-        /* Add a listener */
-        callback = function(arg){
-            console.log("event emitted with arg: ", arg);
-        };
-        emitter.on("event", callback);
-        emitter.on("all", function(event, arg){/*...*/});
-        emitter.on("event", function(arg, emitter){/*...*/});
-        emitter.once("event", function(arg){/*...*/});
-        
-        /* Remove a listener */
-        emitter.off("event", callback);
-        emitter.off("event");
-        emitter.off(callback);
-        emitter.off();
-        
-        /* Emit an event */
-        emitter.emit("event");
-        emitter.emit("event", "argument");
-        emitter.emit("event", null, {
-            errorHandler: console.error,
-            ignoreNamespace: true
-        });
-        emitter.emit("event", null, {},  function(errs){/*...*/});
-        emitter.emit("event").then(function(){/*...*/}, function(errs){/*...*/});
-        
-        /* todo */
-        /* todo: shorten the code example, document the API reference */
-        /* todo: inheritance */
-        
+```javascript
+/* Create a new EventEmitter */
+let emitter = new EventEmitter();
+
+/* Add a listener */
+callback = function (arg) {
+    console.log("event emitted with arg: ", arg);
+};
+emitter.on("event", callback);
+emitter.on("all", function (event, arg) {/*...*/});
+emitter.on("event", function (arg, emitter) {/*...*/});
+emitter.once("event", function (arg) {/*...*/});
+
+/* Remove a listener */
+emitter.off("event", callback);
+emitter.off("event");
+emitter.off(callback);
+emitter.off();
+
+/* Emit an event */
+emitter.emit("event");
+emitter.emit("event", "argument");
+emitter.emit("event", null, {
+    errorHandler: console.error,
+    ignoreNamespace: true
+});
+emitter.emit("event", null, {}, function (errs) {/*...*/});
+emitter.emit("event").then(function () {/*...*/}, function (errs) {/*...*/});
+
+/* todo */
+/* todo: shorten the code example, document the API reference */
+/* todo: inheritance */
+```
 
 ## Motivation
 
@@ -53,16 +54,16 @@ After research, I wasn't satisfied by the numerous implementation of EventEmitte
 
 ## Installation
 
-/* todo: minify + npm, bower, ... */
+*todo: minify + npm, bower, ...*
 
 ## API Reference
 
-/* todo */
+*todo*
 
 
 ## Contributors
 
-/* todo: interface suggestions */
+*todo: interface suggestions*
 
 ## License
 
