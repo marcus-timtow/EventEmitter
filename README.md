@@ -35,7 +35,11 @@ After research, I wasn't satisfied by the implementations of EventEmitter I coul
 
 ## Installation
 
-*todo: minify + npm, bower, ...*
+```
+npm install marcus-timtow/EventEmitter
+```
+*todo: minify*
+*todo: bower*
 
 ## Interfaces (API)
 
