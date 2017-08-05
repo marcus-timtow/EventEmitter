@@ -1,8 +1,8 @@
 ;
 (function (name, definition) {
-    if (typeof define === 'function' && typeof define.amd === 'object') {
+    if (typeof define === "function" && typeof define.amd === "object") {
         define(definition);
-    } else if (typeof module !== 'undefined') {
+    } else if (typeof module !== "undefined") {
         module.exports = definition();
     } else {
         this[name] = definition();
@@ -43,79 +43,93 @@
      * @description EventEmitter constructor
      * 
      * ## Namespace
+     * When an emitter is namespaced, for instance with "namespace", all the events 
+     * it emits will be prepended "namespace:". Note that the proxied events will not 
+     * be namespaced.
      * 
-     * If an EventEmitter is set as a prototype, the listeners and proxy will be relative to the descendant only. 
-     * The namespace however, will be shared between all instances.
+     * @todo It would be possible to add an `options` argument to the `proxy()` interface for such 
+     * purpose if need were to be.
      * 
-     * ## Async 
-     * 
-     * The Event (`.on(), .off(), .once(), .emit()`) API of EventEmitter is asynchronous. That is, 
-     * when any method of this interface is called, the operation is qeued behind all previous 
-     * operation and will only be executed after completion of all previous operation.
+     * ## Operation Queue 
+     * when a method of the main event interface - `on()`, `off()`, `once()`, `emit()` - is called, 
+     * the operation is qeued behind all previous unfinished operations and will 
+     * only be executed after completion of the current operation and all the previously queued operation.
      * 
      * ## Error
+     * When emitting an event, an error may be thrown by a listener callback, such error will be swallowed
+     * by the emitter and the remaining callbacks will be normally called. If the global optional 
+     * errorHandler is specified, it will be called on such errors
      * 
-     * When emitting an event, an error could be thrown by a callback, this error will be intercepted
-     * and an "error" event will be emitted with the Error object, the callback responsible and the 
-     * event concerned : `"error" -> {err: ,callback: ,event: }`
-     * 
-     * @param {String} _namespace 
+     * @param {string} namespace 
+     * @param {object} options 
+     *  * namespace: string
+     *  * errorHandler: function<err: EventError> = console.error
      * 
      * @returns {EventEmitter}
      */
-    var EventEmitter = function (_namespace) {
+    var EventEmitter = function (namespace, options) {
+        if (typeof namespace === "object") {
+            options = namespace;
+            namespace = options.namespace || null;
+        }
+        options = options || {};
+
+        this._errorHandler = options.errorHandler || console.error;
         this._last = null;
         this._listeners = {};
-        let namespace = _namespace ? (_namespace + ":") : "";
-        Object.defineProperty(this, "namespace", {
-            value: _namespace,
-            writable: false
+
+        this.namespace = namespace;
+        Object.defineProperty(this, "_namespace", {
+            get: function () {
+                return this.namespace ? (this.namespace + ":") : "";
+            }
         });
 
 
         /**
-         * @description Register a new listener on an event. The special event "all" allows to listen 
-         * for any event (even internal events) that the emitter may emit.
+         * @description Register a new listener on an event. The special event "all" can be used to listen 
+         * for any event that the emitter may emit. The "all" event listeners callback will be 
+         * passed a first additional argument, the event name.
          * 
-         * *Note : If the emitter is namespaced and the event is not, only proxied events could be listened to.* 
          * 
          * @param {string} event
-         * @param {function} callback : May be passed **one** optional argument
+         * @param {function<arg, emitter>|function<event, arg, emitter>} callback
          * @returns {EventEmitter} this
          */
         this.on = function (event, callback) {
-            if (typeof event === "string" && typeof callback === "function") {
-                let that = this;
-                let operation = function () {
-                    if (!that._listeners[event]) {
-                        that._listeners[event] = [];
-                    }
-                    that._listeners[event].push(callback);
-                    if (operation.next) {
-                        operation.next();
-                    } else if (operation === that._last) {
-                        that._last = null;
-                    }
-                };
-                if (that._last) {
-                    that._last.next = operation;
-                    that._last = operation;
-                } else {
-                    operation();
+            if (typeof event !== "string" || typeof callback !== "function") {
+                throw new Error("Invalid event: " + event + " or callback: " + callback);
+            }
+            let that = this;
+            let operation = function () {
+                if (!that._listeners[event]) {
+                    that._listeners[event] = [];
                 }
+                that._listeners[event].push(callback);
+                if (operation.next) {
+                    operation.next();
+                } else if (operation === that._last) {
+                    that._last = null;
+                }
+            };
+            if (that._last) {
+                that._last.next = operation;
+                that._last = operation;
+            } else {
+                operation();
             }
             return this;
         };
 
 
         /**
-         * @description Unregister either a callback on a specified event (if both arguments are specified), 
-         * either a callback (if only the callback argument was set), either all the callbacks on a given 
-         * event (if only the event argument was specified), either all this emitter listeners (if no argument 
+         * @description Unregister either a specific callback from a specific event (if both arguments are specified), 
+         * either a specific callback from all events (if only the callback argument was set), either all the callbacks on a specific 
+         * event (if only the event argument was specified), either all the listeners (if no argument 
          * was passed).
          * 
-         * @param {string} event *optional*
-         * @param {function} callback *optional*
+         * @param {string} event
+         * @param {function} callback
          * @returns {EventEmitter} this
          */
         this.off = function (event, callback) {
@@ -134,16 +148,17 @@
                             delete that._listeners[event];
                         }
                     }
-                } else if (typeof event === "function") { // depth first search ?
+                } else if (typeof event === "function") {
                     callback = event;
-                    for (var node in listeners) {
+                    for (var event in that._listeners) {
+                        let node = that._listeners[event];
                         var index = node.indexOf(callback);
                         while (index > -1) {
                             node.splice(index, 1);
                             index = node.indexOf(index, callback);
                         }
                     }
-                } else { // Remove everything
+                } else {
                     that._listeners = {};
                 }
                 if (operation.next) {
@@ -162,57 +177,64 @@
         };
 
         /**
-         * @description Like on() but the listener will automatically be removed after it is fired once.
+         * @description Like `on()` but the listener will automatically be removed after being fired once.
          * 
          * @param {string} event
          * @param {function} callback
          * @returns {EventEmitter} this
          */
         this.once = function (event, callback) {
-            if (typeof event === "string" && typeof callback === "function") {
-                let that = this;
-                let obj = {};
-                let flag = false;
-                obj.callback = function () {
-                    if (!flag) {
-                        flag = true;
-                        that.off(event, obj.callback);
-                        callback.apply({}, arguments);
-                    }
-                };
-                this.on(event, obj.callback);
+            if (typeof event !== "string" || typeof callback !== "function") {
+                throw new Error("Invalid event: " + event + " or callback: " + callback);
             }
+            let that = this;
+            let flag = false;
+            let _callback = function (event, arg, emitter) {
+                if (!flag) {
+                    flag = true;
+                    try {
+                        callback(event, arg, emitter);
+                    } catch (err) {
+                        that.off(event, _callback);
+                        throw err;
+                    }
+                    that.off(event, _callback);
+                }
+            };
+            this.on(event, _callback);
             return this;
         };
 
 
         /**
-         * @description Emit an event with the optional argument `arg`. The `options`
-         * argument was originally designed to be used internally only, but it can safely 
-         * be used by end users. 
+         * @description Emit an event with one optional argument `arg`.
          * 
          * @param {string} event
          * @param {?} arg
          * @param {object} options : 
-         *  * {boolean} ignoreNamespace *optional (default : false)* : This event will not be namespaced before being fired 
-         *    (useful for the proxy API where events are already namespaced)
-         * @param {function<array<EventError>>} callback : Callback executed right after the event is emitted, this is useful since the 
-         * listener could emit other events while this one is being emitted. Note that no error will be thrown if a callback is specified
-         * instead, an array of error will be passed as the callback first argument.
+         *  * {boolean} ignoreNamespace = false : This event will not be namespaced (used by the proxy API)
+         *  * {function<err: EventError>} errorHandler 
+         *  * {EventEmitter} emitter : Used by the proxy interface. This option will pass a second/third argument
+         *    to the listeners callbacks - the original emitter.
+         * @param {function<array<EventError>>} callback : Callback executed directly after the event is emitted (after all 
+         * listener callbacks have been executed), this callback is useful beause other events could be emitted
+         * while this one is being emitted, and even though they would be chained, they would be executed before `emit()` 
+         * returns which can be an issue when we want to make sure to execute some routine before any other listener manipulate 
+         * the emitter. Note all errors thrown by the callbacks will be passed to the callback (ot the retunred promise).
          * 
          * @returns {Promise<array<EventError>>} A Promise if no callback is passed
          */
-        this.emit = function (event, arg, options = {}, callback) {
+        this.emit = function (event, arg, options, callback) {
             if (!callback && typeof options === "function") {
                 callback = options;
                 options = {};
             }
+            options = options || {};
             if (!callback) {
                 let that = this;
                 return new Promise(function (resolve, reject) {
                     that.emit(event, arg, options, function (errs) {
                         if (errs && errs.length > 0) {
-                            console.error("EventEmitter swallowed: ", errs);
                             reject(errs);
                         } else {
                             resolve();
@@ -224,8 +246,8 @@
 
             let errs = [];
 
-            if (!options.ignoreNamespace && namespace) {
-                event = namespace + event;
+            if (!options.ignoreNamespace && this._namespace) {
+                event = this._namespace + event;
             }
 
             let that = this;
@@ -235,12 +257,15 @@
                         try {
                             callback(event, arg, options.emitter);
                         } catch (err) {
-                            errs.push(new EventError({
+                            err = new EventError({
                                 err: err,
                                 callback: callback,
                                 event: event,
                                 arg: arg
-                            }));
+                            });
+                            options._errorHandler && options._errorHandler(err);
+                            that._errorHandler && that._errorHandler(err);
+                            errs.push(err);
                         }
                     }
                 }
@@ -250,20 +275,19 @@
                     try {
                         callback(arg, options.emitter);
                     } catch (err) {
-                        errs.push(new EventError({
+                        err = new EventError({
                             err: err,
                             callback: callback,
                             event: event,
                             arg: arg
-                        }));
+                        });
+                        options._errorHandler && options._errorHandler(err);
+                        that._errorHandler && that._errorHandler(err);
+                        errs.push(err);
                     }
                 }
 
-                try {
-                    callback(errs.length > 0 ? errs : null);
-                } catch (err) {  // We have to eat the errors from the callback to ensure that the event flow remain uninterrupted
-
-                }
+                callback(errs.length > 0 ? errs : null);
 
                 if (operation.next) {
                     operation.next();
@@ -277,24 +301,24 @@
                 that._last = operation;
             } else {
                 operation();
-        }
+            }
         };
 
         /**
          * ## Proxy API
          * 
-         * Proxy all events from the registered emitters (even the internal 
-         * events such as error. The registered emitter namespace is preserved.
+         * Proxy all events from the registered emitters. The registered emitter namespace is preserved.
+         * An emitter can only be proxied once and cannot proxy itself. *This method is idempotent.*
          *  
          * The proxied emitters are kept in a weakmap to not impede their GC.
          * 
-         * An emitter can only be proxied once and cannot proxy itself.
+         * @todo : We could easily set up an option to use a Map instead of a WeakMap to prevent the emitters to be GC.
          * 
          */
         this._proxies = new WeakMap();
 
         /**
-         * @description Proxy all events from an EventEmitter through this one. The original EventEmitter namespace will 
+         * @description Proxy all events from an EventEmitter through this one. The original emitter namespace will 
          * be preserved.
          * 
          * @param {EventEmitter} emitter
@@ -324,17 +348,28 @@
          */
         this.unproxy = function (emitter) {
             let callback = this._proxies.get(emitter);
-            if (callback) {
-                emitter.off("all", callback);
-            }
+            callback && emitter.off("all", callback);
             this._proxies.delete(emitter);
             return this;
         };
     };
-    EventEmitter.emancipate = function (obj) {
-        obj._last = null;
-        obj._listeners = {};
-        obj._proxies = new WeakMap();
+    /**
+     * When an object inherits from an EventEmitter (higher in the prototypal chain), the 
+     * listeners, operations and proxies are shared by all instances which share this emitter
+     * in their prototypal chain. This is usually an undesired behavior, hence, this routine 
+     * can be called on any instances to keep those private. 
+     * 
+     * *Note that all previously proxied emitter and registered listener will be forgotten by this
+     * specific instance*
+     * 
+     * @param {EventEmitter} descendant
+     * @returns {EventEmitter} descendant
+     */
+    EventEmitter.emancipate = function (descendant) {
+        descendant._last = null;
+        descendant._listeners = {};
+        descendant._proxies = new WeakMap();
+        return descendant;
     };
 
     /**
@@ -344,20 +379,28 @@
      * ## Refences and Garbage collector
      * To allow the GC to properly collect emitters which are listened to, those are stored in a WeakMap. 
      * 
+     * @todo Records:
+     *         .startRecord(recordId)
+     *         .stopRecord(recordId)
+     *         .stopListeningTo(recordId)
+     * 
      * @returns {EventListener} 
      */
     let EventListener = function () {
         this._emitters = new WeakMap();
 
         /**
-         * @description Listen to an event on a given EventEmitter.
+         * @description Listen to an event on a given emitter.
+         * 
+         * @todo We should make the event optional, with a default value of "all" 
+         * to listen to all events from an emitter
+         * @todo We should support arrays of events.
          * 
          * @param {EventEmitter} emitter
          * @param {string} event
          * @param {function} callback
          * @returns {EventListener} this
          * 
-         * @throws {Error} If an argument is invalid
          */
         this.listenTo = function (emitter, event, callback) {
             if (!emitter.on || !emitter.off) {
@@ -381,19 +424,18 @@
 
             listeners[event].push(callback);
             emitter.on(event, callback);
-
             return this;
         };
 
         /**
-         * @description Stop to listen on 'something' determined by the following combinations of the three arguments.
-         * * emitter, event, callback : Remove this callback from this event in this emitter
-         * * emitter, event : Remove every callback from this event in this emitter
-         * * emitter, callback : Remove this callback from every event in this emitter 
-         * * emitter : Remove every callback from every event in this emitter
+         * @description Stop to listen to *something* determined by the following combinations of arguments:
+         * * emitter, event, callback : Remove a specific callback from a specific event on a specific emitter
+         * * emitter, event : Remove every callback from a specific event on a specific emitter
+         * * emitter, callback : Remove a specific callback from every event on a specific emitter 
+         * * emitter : Remove every callback from every event on a specific emitter
          * 
-         * *Note: We can not operate on every emitter listened to at the same time (for instance, removing a callback from 
-         * all emitters at once) since the elements of a weakmap cannot be walked throught.*
+         * *Note: We can not operate on every emitter listened to at the same time (for instance, removing a specific callback from 
+         * all emitters at once) since the elements of a WeakMap cannot be walked throught.*
          * 
          * 
          * @param {EventEmitter} emitter
@@ -410,7 +452,7 @@
                     return this;
                 }
 
-                if (typeof callback === "function") { // remove this callback from this event in this emitter
+                if (typeof callback === "function") { // remove a specific callback from a specific event in a specific emitter
                     for (var i = 0; i < callbacks.length; i++) {
                         if (callbacks[i] === callback) {
                             emitter.off(event, callback);
@@ -418,18 +460,17 @@
                             i--;
                         }
                     }
-                    // Cleanup
                     if (callbacks.length === 0) {
                         delete listeners[event];
                     }
-                } else { // remove every callback from this event in this emitter
+                } else { // remove every callback from a specific event in a specific emitter
                     for (var i = 0; i < callbacks.length; i++) {
                         emitter.off(event, callbacks[i]);
                     }
                     delete listeners[event];
                 }
 
-            } else if (typeof event === "function") { // remove this callback from every event in this emitter
+            } else if (typeof event === "function") { // remove a specific callback from every event on a specific emitter
                 callback = event;
                 for (let event in listeners) {
                     var callbacks = listeners[event];
@@ -440,13 +481,11 @@
                             i--;
                         }
                     }
-
-                    // cleanup
                     if (callbacks.length === 0) {
                         delete listeners[event];
                     }
                 }
-            } else { // remove every callback from every event in this emitter
+            } else { // remove every callback from every event on a specific emitter
                 for (let event in listeners) {
                     let callbacks = listeners[event];
                     for (var i = 0; i < callbacks.length; i++) {
@@ -457,16 +496,17 @@
             }
         };
     };
-    EventListener.emancipate = function (obj) {
-        obj._emitters =  new WeakMap();
+    /**
+     * @see `EventEmitter.emancipate`
+     * 
+     * @param {EventEmitter} descendant
+     * @returns {EventEmitter} descendant
+     */
+    EventListener.emancipate = function (descendant) {
+        descendant._emitters = new WeakMap();
+        return descendant;
     };
     EventEmitter.EventListener = EventListener;
 
     return EventEmitter;
 }));
-
-
-
-
-
-
