@@ -16,7 +16,8 @@
      *  * arg :
      *  * err|error :
      */
-    let EventError = function (options = {}){
+    let EventError = function (options){
+        options = options || {};
         this.event = options.event || "";
         this.arg = options.arg;
         this.callback = options.callback;
@@ -74,7 +75,7 @@
         }
         options = options || {};
 
-        this._errorHandler = options.errorHandler || console.error;
+        this._errorHandler = options.errorHandler || console.error.bind(console);
         this._last = null;
         this._listeners = {};
 
