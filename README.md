@@ -7,9 +7,8 @@ An extended implementation of the observer pattern.
 
 This component can be used both in the browser and node.js (the module definition is done in AMD style, node style or as a browser global)
 
-This component defines two different classes `EventEmitter` and `EventListener`. The `EventEmitter` class exposes two interfaces, the **emitter** interface -`on`, `off`, `once`, `emit`- and the **proxy** interface - `proxy`, `unproxy`. 
-The `EventListener` class expose a single **listener** -`listenTo`, `stopListeningTo`- interface. 
-*A second interface, **records**, is in progress on `EventListener`*
+This component defines two different classes `EventEmitter` and `EventListener`. The `EventEmitter` class exposes two interfaces, the **emitter** interface -`on()`, `off()`, `once()`, `emit()`- and the **proxy** interface - `proxy()`, `unproxy()`. 
+The `EventListener` class exposes a two interfaces, the **listener** interface -`listenTo()`, `stopListeningTo()` and the **records** interface - `startRecording()`, `stopRecording()` and `Recording.roolback()`.
 
 
 ## Code Example
@@ -31,7 +30,7 @@ emitter.emit("event", "argument");
 
 ## Motivation
 
-After research, I wasn't satisfied by the implementations of EventEmitter I could find. Of all browser+node.js implementations I could find, none was both concise and complete enough. 
+After research, I wasn't satisfied by the implementations of EventEmitter I could find. Of all browser+node.js implementations I could find, none was both simple and complete enough. 
 
 ## Installation
 
@@ -64,7 +63,7 @@ Unregister a listener.
 
 #### EventEmitter.emit
 ```
-emit: function<event: string, arg = undefined[, options][, callback: function<errs: array<EventError>>]): EventEmitter
+emit: function<event: string, arg = undefined[, options][, callback: function<errs: null|array<EventError>>]): EventEmitter
 ```
 Emit an event and pass an optional argument `arg` to the listener callbacks. 
 An `options` object can be passed as a **third** argument (it will be interpreted as `arg` if passed as second argument). `options` contains detail of the firing process:
@@ -99,11 +98,16 @@ Register to an event just like `on` but keep track of it for later unregisterati
  * If only `emitter` is specified
  * **emitter must always be specified, since EventListener use a WeakMap to internally store the emitters listened to EventListener cannot automatically retrieve. TODO: This behavior may be changed via an option.**
 
-### **Draft**: EventListener - The **record** interface
+### EventListener - The **record** interface
 
- * `startRecord: function<>: Record`
- * `Record.stop<>: Record`
- * `Record.rollback<>`
+```
+startRecording: function<>
+stopRecording: function<>: Recording
+
+Recording.rollback: function<>
+```
+
+*todo*
  
 ### Instanciation & Inheritance
 
@@ -111,29 +115,14 @@ Inheriting from the EventEmitter/EventListener classes require certain precautio
 ```javascript
 /* Direct instanciations */
 let emitter = new EventEmitter(); 
-let obj = {}; EventEmitter.call(obj);
 
 /* Inheritence */
 let MyEventEmitter = function(){
-    EventEmitter.emancipate(this);
+    EventEmitter.call(this); // EventEmitter.emancipate(this) is deprecated
     /* ... */
 };
-MyEventEmitter.prototype = new EventEmitter();
-
-let MyWhateverEventEmitter = function(){
-    EventEmitter.emancipate(this);
-    /* ... */
-};
-MyWhateverEventEmitter.prototype = new Whatever();
-EventEmitter.call(MyWhateverEventEmitter.prototype);
+MyEventEmitter.prototype = Object.create(EventEmitter.prototype); 
 ```
-
-```
-EventEmitter.emancipate<emitter: EventEmitter>: EventEmitter
-EventListener.emancipate<listener: EventListener>: EventListener
-```
-
-When an object inherits from an EventEmitter or EventListener (higher in the prototypal chain), the listeners, operations, proxies and emitters stored internally are shared by all instances sharing this emitter in their prototypal chain. This is usually undesired behavior, hence, the `emancipate` static method can be called on any instances to keep those private. *Note that all previously proxied emitter, registered listener and emitters will be forgotten by this specific instance.*
 
 
 ## Contributors
